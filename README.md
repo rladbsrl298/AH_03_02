@@ -20,6 +20,69 @@
 
 ---
 
+## 서비스 개요
+
+- **대상** — 40세 이상 성인 중 만성신장질환(CKD) 위험군
+- **핵심 흐름** — 건강검진 결과 입력 → 위험 예측 → 위험 단계 배정(G1~G4) → 맞춤 생활습관 챌린지 → 대시보드
+- **주요 기능**
+  - 검진 결과 입력 — 직접 입력, 또는 결과지 사진·PDF를 올리면 OCR로 자동 입력
+  - 위험 단계 배정과 단계별 맞춤 챌린지
+  - 챌린지 참여에 따라 캐릭터가 성장하는 게이미피케이션
+  - 대시보드 — 참여 기록, 사구체여과율(eGFR) 추이와 생활습관 개선 시 시뮬레이션
+  - 의료 문헌 기반 RAG 상담 챗봇 (팀원 담당)
+
+---
+
+## 시스템 구조
+
+팀 전체 시스템 구조입니다. 오른쪽 **담당** 칸에 제가 맡은 부분을 표시했습니다.
+
+```
+사용자 ──► nginx ──► fastapi (app/, Producer)
+                         │ Redis Stream (ckd_jobs / rag_jobs)
+                         ▼
+                    ai-worker (ai_worker/, Consumer)
+                         ├── PostgreSQL  (검진·예측결과·SHAP·AI가이드)
+                         ├── Redis       (작업 큐·응답 스트림 rag_resp)
+                         └── Qdrant      (RAG 벡터 DB)
+```
+
+| 컨테이너 | 역할 | 코드 위치 | 담당 |
+|---|---|---|---|
+| `fastapi` | API 서버 (Producer) | `app/` | **본인** |
+| `postgres` | DB | — | **본인** — 스키마 설계·DB 선정([ADR-0001](docs/05-adr/ADR-0001-database.md))·마이그레이션 |
+| `ai-worker` | 위험 예측 추론 + RAG 챗봇 (Consumer) | `ai_worker/` | 팀원 |
+| `qdrant` | RAG 벡터 DB | — | 팀원 |
+| `redis` | 작업 큐 (Redis Stream) | — | 팀 |
+| `nginx` | 리버스 프록시 | `infra/nginx/` | 팀 |
+
+프론트엔드(`frontend/`)는 nginx가 정적 파일로 서빙하며, 화면 전 구간을 제가 맡았습니다.
+인프라 구성(컨테이너·배포)은 팀 공동 작업입니다.
+
+---
+
+## 폴더 구조
+
+```
+.
+├─ app/              ← FastAPI 백엔드 (apis·services·repositories·models·dtos·tests)   ★ 본인
+├─ frontend/         ← Vite + React (ckd-care-app)                                      ★ 본인
+├─ ai_worker/        ← AI Worker (위험 예측 추론·LLM·RAG)                                  팀원
+├─ src/
+│  ├─ ckd/           ← 위험 예측 모델 학습                                                 팀원
+│  └─ rag_indexing/  ← RAG 지식 베이스 인덱싱                                              팀원
+├─ infra/            ← Nginx 설정·운영 Docker Compose
+├─ scripts/          ← CI 스크립트 (lint·mypy·test·deploy)
+├─ docs/             ← 프로젝트 문서 (05-adr/ ADR · load-test/ 부하 테스트 결과)
+└─ docker-compose.yml
+```
+
+백엔드 기능은 `app/` 안에서 **6개 파일 한 세트**로 추가합니다 —
+`dtos → models → repositories → services → apis/v1 → tests`.
+상세 구조는 [docs/folder-structure-guide.md](docs/folder-structure-guide.md)에 있습니다.
+
+---
+
 ## 담당한 일
 
 **사용자 화면 전 구간**
