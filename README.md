@@ -29,6 +29,10 @@
 **백엔드**
 services · apis · repositories · dtos · models · core · tests 계층을 기능 단위로 함께 작업했습니다.
 
+**검진 결과지 OCR 자동 입력** — [`app/services/ocr.py`](app/services/ocr.py)
+검진 결과지 사진이나 PDF를 올리면 NAVER CLOVA OCR로 글자를 읽어 혈압·공복혈당·콜레스테롤·중성지방·
+크레아티닌·키·체중·허리둘레 등 10종을 입력 칸에 자동으로 채웁니다. 여러 쪽짜리 PDF는 쪽 단위로 나눠 처리합니다.
+
 **캐릭터 일러스트 시스템**
 Gemini로 생성한 PNG 10~13장에 SVG·이모지 폴백을 붙이고, 진화 단계를 4단계에서 3단계로 줄였습니다.
 
@@ -37,7 +41,7 @@ Gemini로 생성한 PNG 10~13장에 SVG·이모지 폴백을 붙이고, 진화 �
 
 **그 외**
 - Resend 기반 비밀번호 재설정 이메일 인증 (데모/프로덕션 토글)
-- Locust 부하 테스트 — 동시 접속 50명 조건에서 조회 API P95 18ms, 실패율 0%
+- Locust 부하 테스트 — 동시 접속 50명 조건에서 조회 API P95 15ms, 실패율 0%
 - 한국어 에러 미들웨어 (Pydantic 422 응답을 한국어 메시지로 변환)
 - 아키텍처 의사결정 기록(ADR) 4건 — 데이터베이스 · 프론트엔드 · 인증 · 브랜치 전략
 - 문제 정의 · 화면 흐름 · R&R 문서화
@@ -62,6 +66,15 @@ ORM은 SQLAlchemy가 동기 기본이라 async 설정 부담이 있어, 비동�
 상태의 90%가 서버 상태라 Redux/Zustand는 과하다고 보고 TanStack Query 캐싱으로 처리했으며,
 고령 사용자를 고려해 번들을 가볍게 잡았습니다.
 
+**검진지 OCR — 표 형식 결과지의 오탐**
+
+표 형식 검진지에서 총콜레스테롤 칸이 HDL(고밀도 콜레스테롤) 값을 가로채는 오탐이 반복됐습니다.
+CLOVA OCR이 글자 조각마다 줄바꿈 신호를 보내는 경우가 많아, 한 행으로 묶여야 할 글자들이 흩어진 것이 원인이었습니다.
+
+- 줄바꿈 신호 대신 글자 조각의 **좌표**로 같은 행을 다시 묶고 가로 순서대로 정렬했습니다
+- "고밀도"·"저밀도"가 들어간 행은 총콜레스테롤로 매핑하지 않도록 막았습니다
+- HDL은 두 줄짜리 셀이라 이웃 행 숫자까지 끌어오는 문제가 있어, 셀 경계를 기준으로 읽는 전용 규칙을 따로 두었습니다
+
 ---
 
 ## 배운 것 · 한계
@@ -79,7 +92,7 @@ ORM은 SQLAlchemy가 동기 기본이라 async 설정 부담이 있어, 비동�
 
 - **Backend** — Python, FastAPI, Tortoise ORM + aerich, PostgreSQL 16
 - **Frontend** — React 19, Vite, TypeScript, Tailwind CSS v4, TanStack Query
-- **기타** — Resend(이메일), Locust(부하 테스트), Gemini(일러스트 생성)
+- **기타** — NAVER CLOVA OCR, Resend(이메일), Locust(부하 테스트), Gemini(일러스트 생성)
 
 RAG 파이프라인·벡터 DB·예측 모델 등 팀원이 맡은 영역의 구성과 실행 방법은
 원본 저장소 [AI-HealthCare-03/AH_03_02](https://github.com/AI-HealthCare-03/AH_03_02)를 참고해 주세요.
